@@ -133,22 +133,19 @@
   </script>
 
   <script>
-    // A–Z-Schnellfilter: Bei aktivem Buchstaben werden alle Treffer ohne Kategorien gemeinsam angezeigt.
+    // Kategorienübergreifende Artikelansicht; vorhandene Programmdateien bleiben unverändert.
     document.addEventListener('DOMContentLoaded', () => {
       const app = document.getElementById('app');
       if (!app) return;
-
       const bar = document.createElement('nav');
       bar.className = 'azFilterBar';
       bar.setAttribute('aria-label', 'Produkte alphabetisch filtern');
-
       const allBtn = document.createElement('button');
       allBtn.type = 'button';
       allBtn.className = 'azAll active';
       allBtn.textContent = 'Alle';
       allBtn.dataset.letter = '';
       bar.appendChild(allBtn);
-
       'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(letter => {
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -157,116 +154,71 @@
         btn.setAttribute('aria-label', `Produkte mit ${letter}`);
         bar.appendChild(btn);
       });
-
-      const noResults = document.createElement('div');
-      noResults.className = 'azNoResults';
-      noResults.textContent = 'Keine Produkte mit diesem Anfangsbuchstaben gefunden.';
-
-      const flatResults = document.createElement('div');
-      flatResults.className = 'azFlatResults';
-      flatResults.hidden = true;
-
       app.parentNode.insertBefore(bar, app);
-      app.parentNode.insertBefore(noResults, app);
 
       let activeLetter = '';
-      let applying = false;
+      let allCategories = true;
       let observer;
-      const originalTopLevelDisplay = new Map();
-      const markers = new Map();
-
-      const normalize = value => (value || '')
-        .trim()
-        .toLocaleUpperCase('de-DE')
-        .replace(/^Ä/, 'A')
-        .replace(/^Ö/, 'O')
-        .replace(/^Ü/, 'U');
-
-      function productCards() {
-        const selectors = [
-          '.productCard', '.product-card', '.product', '[data-product-id]', '[data-product]',
-          '.item-card', '.item', 'article'
-        ];
-        const direct = [...app.querySelectorAll(selectors.join(','))].filter(el => el.querySelector('img'));
-        if (direct.length >= 2) return [...new Set(direct)];
-
-        const found = [];
-        app.querySelectorAll('img').forEach(img => {
-          let card = img.closest('button,[role="button"],li,.card,.tile,.productCard,.product-card,.product,.item,article');
-          if (!card) card = img.parentElement?.parentElement || img.parentElement;
-          if (!card || card === app || card === flatResults) return;
-          const marker = `${card.id || ''} ${card.className || ''}`.toLowerCase();
-          if (/cart|basket|checkout|summary|money|cash|coin|note|payment|change|receipt|report|total/.test(marker)) return;
-          if ((card.textContent || '').trim().length === 0 && !(img.alt || '').trim()) return;
-          found.push(card);
-        });
-        return [...new Set(found)];
-      }
-
-      function productName(card) {
-        const named = card.querySelector('[data-name],.productName,.product-name,.name,.title,h2,h3,h4,strong');
-        if (named) return named.getAttribute('data-name') || named.textContent || '';
-        const img = card.querySelector('img[alt]');
-        if (img && img.alt.trim()) return img.alt;
-        return card.textContent || '';
-      }
-
-      function restoreFlattenedCards() {
-        [...markers.entries()].forEach(([card, marker]) => {
-          if (marker.parentNode) marker.replaceWith(card);
-          markers.delete(card);
-        });
-      }
-
-      function restoreNormalView() {
-        restoreFlattenedCards();
-        originalTopLevelDisplay.forEach((display, node) => {
-          if (node.isConnected) node.style.display = display;
-        });
-        originalTopLevelDisplay.clear();
-        flatResults.hidden = true;
-        flatResults.remove();
-      }
+      let lastGrid = null;
+      let originalGrid = '';
+      let originalHeader = '';
+      const normalize = value => (value || '').trim().toLocaleUpperCase('de-DE')
+        .replace(/^Ä/, 'A').replace(/^Ö/, 'O').replace(/^Ü/, 'U');
 
       function applyFilter() {
-        if (applying) return;
-        applying = true;
         if (observer) observer.disconnect();
-
-        restoreFlattenedCards();
-
-        if (!activeLetter) {
-          restoreNormalView();
-          noResults.classList.remove('visible');
-        } else {
-          if (!flatResults.isConnected) app.appendChild(flatResults);
-
-          [...app.children].forEach(node => {
-            if (node === flatResults) return;
-            if (!originalTopLevelDisplay.has(node)) originalTopLevelDisplay.set(node, node.style.display || '');
-            node.style.display = 'none';
-          });
-
-          flatResults.hidden = false;
-          flatResults.innerHTML = '';
-
-          const cards = productCards();
-          let visible = 0;
-          cards.forEach(card => {
-            if (!normalize(productName(card)).startsWith(activeLetter)) return;
-            const marker = document.createComment('az-product-position');
-            card.parentNode.insertBefore(marker, card);
-            markers.set(card, marker);
-            flatResults.appendChild(card);
-            card.style.display = '';
-            visible++;
-          });
-
-          noResults.classList.toggle('visible', cards.length > 0 && visible === 0);
+        const panel = app.querySelector('.catPanel');
+        const list = panel?.querySelector('.catList');
+        const grid = app.querySelector('.productPanel .productGrid');
+        const header = app.querySelector('.productHeader h1');
+        if (!panel || !list || !grid || !header) {
+          if (observer) observer.observe(app, {childList:true,subtree:true});
+          return;
         }
-
-        if (observer) observer.observe(app, {childList:true, subtree:true});
-        applying = false;
+        if (grid !== lastGrid) {
+          lastGrid = grid;
+          originalGrid = grid.innerHTML;
+          originalHeader = header.innerHTML;
+        }
+        let categoriesBtn = panel.querySelector('.allCategoriesBtn');
+        if (!categoriesBtn) {
+          categoriesBtn = document.createElement('button');
+          categoriesBtn.type = 'button';
+          categoriesBtn.className = 'catBtn allCategoriesBtn';
+          categoriesBtn.textContent = 'Alle Kategorien';
+          categoriesBtn.style.cssText = 'width:100%;margin:8px 0 10px;background:#e8f5e9;color:#173126;text-shadow:none;';
+          list.parentNode.insertBefore(categoriesBtn, list);
+          categoriesBtn.addEventListener('click', () => {
+            allCategories = !allCategories;
+            applyFilter();
+          });
+        }
+        categoriesBtn.classList.toggle('active', allCategories);
+        categoriesBtn.setAttribute('aria-pressed', String(allCategories));
+        if (!allCategories && !activeLetter) {
+          if (grid.dataset.azGenerated === 'true') {
+            grid.innerHTML = originalGrid;
+            grid.querySelectorAll('[data-product]').forEach(b => {
+              b.onclick = () => addProduct(b.dataset.product, b.dataset.file);
+            });
+          }
+          delete grid.dataset.azGenerated;
+          header.innerHTML = originalHeader;
+        } else {
+          const products = Object.values(PRODUCT_DATA)
+            .flatMap(category => category.items)
+            .filter(([name]) => !activeLetter || normalize(name).startsWith(activeLetter))
+            .sort(([nameA], [nameB]) => nameA.localeCompare(nameB, 'de-DE', {sensitivity:'base'}));
+          header.textContent = activeLetter ? `Alle Kategorien – ${activeLetter}` : 'Alle Kategorien';
+          grid.innerHTML = products.length
+            ? products.map(([name,file]) => productCard(name,file)).join('')
+            : '<p class="azNoResults visible">Keine Produkte mit diesem Anfangsbuchstaben gefunden.</p>';
+          grid.dataset.azGenerated = 'true';
+          grid.querySelectorAll('[data-product]').forEach(b => {
+            b.onclick = () => addProduct(b.dataset.product,b.dataset.file);
+          });
+        }
+        if (observer) observer.observe(app, {childList:true,subtree:true});
       }
 
       bar.addEventListener('click', event => {
@@ -276,24 +228,16 @@
         bar.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
         applyFilter();
       });
-
-      flatResults.addEventListener('click', event => {
-        if (!activeLetter) return;
-        const selectedCard = [...markers.keys()].find(card => card === event.target || card.contains(event.target));
-        if (!selectedCard) return;
-
-        window.setTimeout(() => {
-          activeLetter = '';
-          bar.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === allBtn));
-          applyFilter();
-        }, 0);
-      });
-
-      observer = new MutationObserver(() => {
-        window.clearTimeout(observer._azTimer);
-        observer._azTimer = window.setTimeout(applyFilter, 40);
-      });
-      observer.observe(app, {childList:true, subtree:true});
+      // Die Auswahl einer Einzelkategorie führt wieder zu ihrer normalen Artikelansicht.
+      app.addEventListener('click', event => {
+        if (!event.target.closest('[data-cat]')) return;
+        allCategories = false;
+        activeLetter = '';
+        bar.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === allBtn));
+      }, true);
+      observer = new MutationObserver(applyFilter);
+      observer.observe(app, {childList:true,subtree:true});
+      applyFilter();
     });
   </script>
 
@@ -302,6 +246,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       const app = document.getElementById('app');
       const bar = document.querySelector('.azFilterBar');
+      const categoriesRow = document.querySelector('.allCategoriesBar');
       const topbar = document.querySelector('.topbar');
       if (!app) return;
 
@@ -314,7 +259,7 @@
           app.style.height = '';
 
           const vh = window.visualViewport?.height || window.innerHeight;
-          const used = (topbar?.getBoundingClientRect().height || 0) + (bar?.getBoundingClientRect().height || 0);
+          const used = (topbar?.getBoundingClientRect().height || 0) + (bar?.getBoundingClientRect().height || 0) + (categoriesRow?.getBoundingClientRect().height || 0);
           const available = Math.max(1, vh - used - 4);
           const needed = Math.max(app.scrollHeight, app.getBoundingClientRect().height);
           const scale = Math.min(1, available / Math.max(1, needed));
