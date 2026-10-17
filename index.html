@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lernkasse 2.0</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Lernkasse">
+  <meta name="theme-color" content="#175cba">
+  <link rel="stylesheet" href="css/style.css">
+
+  <style>
+    html,body{height:100%;height:100dvh;overflow:hidden}
+    body{display:flex;flex-direction:column;margin:0}
+    .topbar{flex:0 0 auto}
+    #app{flex:1 1 auto;min-height:0;transform-origin:top center}
+    .azFilterBar{flex:0 0 auto;display:grid;grid-template-columns:repeat(27,minmax(0,1fr));gap:.2rem;align-items:center;padding:.3rem .45rem;margin:.2rem auto .1rem;width:min(100%,1100px);box-sizing:border-box}
+    .azFilterBar button{min-width:0;min-height:1.85rem;padding:.15rem .1rem;border:1px solid #b7c8bd;border-radius:.45rem;background:#fff;color:#173c27;font:inherit;font-size:clamp(.62rem,1.25vw,.9rem);font-weight:700;cursor:pointer}
+    .azFilterBar button:hover,.azFilterBar button:focus-visible{outline:2px solid #2e7d32;outline-offset:1px}
+    .azFilterBar button.active{background:#2e7d32;color:#fff;border-color:#2e7d32}
+    .azFilterBar .azAll{min-width:0;padding-inline:.1rem;font-size:clamp(.52rem,1vw,.78rem)}
+    .azFlatResults{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.45rem;padding:.4rem}
+    .azNoResults{display:none;margin:.75rem auto;max-width:1100px;padding:.8rem 1rem;border-radius:.7rem;background:#fff3cd;color:#664d03}
+    .azNoResults.visible{display:block}
+    @media (max-width:760px){
+      .azFilterBar{grid-template-columns:repeat(14,minmax(0,1fr));gap:.15rem;padding:.2rem .3rem}
+      .azFilterBar button{min-height:1.55rem;font-size:.68rem}
+    }
+
+    /* Version 2.0 – Gestaltung analog zur Einkaufsliste */
+    :root{color-scheme:light;--blue:#175cba;--blue-dark:#103d83;--blue-light:#e9f2ff;--line:#d8e5f5;--ink:#19324e;--muted:#607c99}
+    *{box-sizing:border-box}
+    body{font-family:Arial,Helvetica,sans-serif;background:#edf4fc;color:var(--ink)}
+    .topbar{background:linear-gradient(105deg,#103f86,#2574d4)!important;color:white!important;box-shadow:0 2px 10px #183d781c;padding:12px 20px}
+    .topbar strong{color:#fff}.topbar .versionBadge{background:#ffffff30;color:white}
+    .topbar .ghost{background:#ffffff20!important;color:white!important;border:1px solid #ffffff88!important;border-radius:12px}
+    .azFilterBar{width:100%;max-width:none;margin:0;padding:9px 14px;gap:4px;background:white;border-bottom:1px solid var(--line)}
+    .azFilterBar button{background:var(--blue-light);color:var(--blue-dark);border:1px solid #cbdff9;border-radius:7px;padding:6px 1px;min-height:30px}
+    .azFilterBar button.active{background:var(--blue);color:white;border-color:var(--blue)}
+    .azFilterBar button:hover,.azFilterBar button:focus-visible{outline-color:var(--blue)}
+    #app{padding:12px;gap:12px;background:#edf4fc;color:var(--ink)}
+    #app .catPanel,#app .productPanel,#app .cartPanel,#app .basketPanel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 2px 10px #1d4e7d15;min-width:0}
+    #app .cartPanel,#app .basketPanel{background:#f8fbff}
+    #app .catBtn{display:flex;align-items:center;width:100%;margin-bottom:7px;padding:11px;border:1px solid var(--line);border-radius:10px;text-align:left;font-weight:700;cursor:pointer;color:#193d70;background:#f5f9ff}
+    #app .catBtn.active{outline:3px solid #123c75;outline-offset:-3px;box-shadow:0 0 0 2px #fff inset}
+    #app .allCategoriesBtn{background:#e9f2ff!important;color:var(--blue-dark)!important;border-color:#cbdff9!important}
+    #app .allCategoriesBtn.active{background:var(--blue)!important;color:white!important;outline:none;box-shadow:none}
+    #app .productHeader h1,#app .cartPanel h1,#app .cartPanel h2{color:var(--blue-dark)}
+    #app .productGrid{gap:10px}
+    #app [data-product]{background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:0 2px 6px #17426d10}
+    #app [data-product]:hover{border-color:#77acec;box-shadow:0 4px 12px #17426d24}
+    .clearCartButton{display:block;width:100%;padding:11px 12px;margin:8px 0;border-radius:12px;border:1px solid #bed8f6;background:#dceafe;color:var(--blue-dark);font-size:1rem;font-weight:700;cursor:pointer}
+    .clearCartButton:hover{background:#c4dfff}
+    /* Identische Kategorie-Farbpalette wie in der Einkaufsliste */
+    #app .catBtn.milch,#app [data-cat*="Milch"]{background:#64B5F6}
+    #app .catBtn.gemuese,#app [data-cat*="Gemüse"]{background:#81C784}
+    #app .catBtn.obst,#app [data-cat="Obst"]{background:#FFB74D}
+    #app .catBtn.fleisch,#app [data-cat="Fleisch"]{background:#E57373}
+    #app .catBtn.wurst,#app [data-cat="Wurst"]{background:#BA68C8}
+    #app .catBtn.fisch,#app [data-cat*="Fisch"]{background:#4DD0E1}
+    #app .catBtn.konserven,#app [data-cat="Konserven"]{background:#A1887F}
+    #app .catBtn.getreide,#app [data-cat*="Getreide"]{background:#FFD54F}
+    #app .catBtn.gewuerze,#app [data-cat*="Gewürze"]{background:#90A4AE}
+    #app .catBtn.suess,#app [data-cat*="Süß"]{background:#F06292}
+    #app .catBtn.sonstiges,#app [data-cat="Sonstiges"]{background:#BDBDBD}
+    #app .catList .catBtn:not(.allCategoriesBtn){color:#182c45}
+    #app .catList .catBtn.active{outline:3px solid #123c75;outline-offset:-3px}
+    @media(max-width:760px){#app{padding:7px;gap:7px}.azFilterBar{padding:7px;gap:3px}.azFilterBar button{font-size:11px}}
+  </style>
+
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <strong>🛒 Lernkasse</strong><small class="versionBadge">v2.0</small>
+      <span id="customerBadge">Kunde 1</span>
+    </div>
+    <div class="topActions">
+      <button id="practiceBtn" class="ghost practiceTop" title="Übungsmodus" aria-label="Übungsmodus starten">🎲 Üben</button>
+      <button id="teacherBtn" class="ghost iconOnly" title="Lehrkraft" aria-label="Lehrkraft">⚙️</button>
+      <button id="helpBtn" class="ghost iconOnly" title="Hilfe" aria-label="Hilfe">?</button>
+      <button id="infoBtn" class="ghost iconOnly" title="Info" aria-label="Info">i</button>
+      <button id="reportBtn" class="ghost iconOnly" title="Protokoll" aria-label="Protokoll">📄</button>
+    </div>
+  </header>
+
+  <main id="app" class="app" aria-live="polite"></main>
+
+  <dialog id="helpDialog" class="dialog">
+    <h2>Hilfe</h2>
+    <ol>
+      <li>Produkte antippen oder über „Üben“ einen Zufallseinkauf starten.</li>
+      <li>Auf „Zur Kasse“ tippen.</li>
+      <li>Scheine und Münzen antippen.</li>
+      <li>Auf „Wechselgeld zeigen“ tippen.</li>
+      <li>Wechselgeld herausgeben.</li>
+    </ol>
+    <button class="primary" onclick="closeDialog('helpDialog')">Schließen</button>
+  </dialog>
+
+  <dialog id="reportDialog" class="dialog wide">
+    <h2>Verkaufsprotokoll</h2>
+    <div id="reportContent"></div>
+    <div class="dialogActions">
+      <button class="secondary csvBtn" id="downloadCsvBtn">CSV speichern</button>
+      <button class="secondary pdfBtn" id="downloadPdfBtn">PDF speichern</button>
+      <button class="primary" onclick="closeDialog('reportDialog')">Schließen</button>
+    </div>
+  </dialog>
+
+  <dialog id="teacherDialog" class="dialog wide">
+    <h2>Lehrermodus</h2>
+    <div id="teacherContent"></div>
+    <div class="dialogActions">
+      <button class="primary" onclick="closeDialog('teacherDialog')">Schließen</button>
+    </div>
+  </dialog>
+
+
+  <dialog id="infoDialog" class="dialog wide infoDialog">
+    <h2>🔒 Datenschutz &amp; Impressum</h2>
+    <div class="infoSections">
+      <section class="infoSection">
+        <h3>🗄️ Datenspeicherung</h3>
+        <p>Diese App speichert keine persönlichen Daten. Es werden keine Namen, Standorte, Nutzungsverhalten oder sonstige Informationen gespeichert oder übertragen.</p>
+        <p>Die App läuft vollständig im Browser des Geräts. Alle Inhalte (Schriften, Audio, Programmcode) sind direkt in der App-Datei eingebettet. Eine Internetverbindung ist nach dem ersten Laden nicht erforderlich.</p>
+      </section>
+      <section class="infoSection">
+        <h3>☁️ Hosting &amp; Server</h3>
+        <p>Die App wird über GitHub Pages (GitHub Inc., 88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, USA) bereitgestellt. Beim ersten Abruf der App-Seite speichert GitHub automatisch Server-Logs mit IP-Adresse, Zeitstempel und Browser-Typ. Diese Logs werden von GitHub verwaltet und sind nicht durch den Betreiber dieser App einsehbar oder beeinflussbar. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse am sicheren Betrieb).</p>
+        <p><strong>Offline-Nutzung:</strong> Nach dem ersten Aufruf speichert der Browser die App lokal (Service Worker / Cache). Danach werden keinerlei Serverzugriffe mehr durchgeführt — auch keine Logs.</p>
+        <p>Datenschutzerklärung von GitHub: <a href="https://docs.github.com/privacy" target="_blank" rel="noopener">docs.github.com/privacy</a></p>
+      </section>
+      <section class="infoSection">
+        <h3>🖼️ Bildmaterial &amp; Urheberrecht</h3>
+        <p>Die in dieser App verwendeten Produktbilder stammen überwiegend aus dem <strong>EDEKA-Sortiment</strong> und wurden selbst fotografiert. Die Nutzung erfolgt ausschließlich im nichtkommerziellen Rahmen für Bildungs- und Förderzwecke.</p>
+        <p>Die verwendeten Geldabbildungen stammen von <strong>Pictosearch</strong>.</p>
+        </section>
+      <section class="infoSection">
+        <h3>📞 Kontakt</h3>
+        <p>Bei Fragen oder Anmerkungen erreichst du den App-Entwickler per E-Mail:<br><a href="mailto:matthias.scheibelhut-beck@hephata-schulnetz.de">matthias.scheibelhut-beck@hephata-schulnetz.de</a></p>
+      </section>
+    </div>
+    <div class="dialogActions">
+      <button class="primary" onclick="closeDialog('infoDialog')">Schließen</button>
+    </div>
+  </dialog>
+
+  <script src="js/products.js" defer></script>
+  <script src="js/app.js" defer></script>
+  <script>
+    // Zugangsschutz für Einstellungen: Ziffern 7, 2, 9, 1, 5, 4 müssen aufsteigend eingegeben werden.
+    document.addEventListener('DOMContentLoaded', () => {
+      const teacherBtn = document.getElementById('teacherBtn');
+      if (!teacherBtn) return;
+
+      const settingsDigits = ['7', '2', '9', '1', '5', '4'];
+      const settingsCode = [...settingsDigits].sort().join('');
+      teacherBtn.addEventListener('click', (event) => {
+        const entered = window.prompt(
+          `Einstellungen geschützt. Code eingeben: ${settingsDigits.join('  ')}`
+        );
+
+        if (entered === settingsCode) return;
+
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (entered !== null) window.alert('Code nicht korrekt. Einstellungen bleiben gesperrt.');
+      }, true);
+    });
+  </script>
+
+  <script>
+    // Alphabetischer Filter innerhalb der ausgewählten Kategorie bzw. aller Kategorien.
+    document.addEventListener('DOMContentLoaded', () => {
+      const app = document.getElementById('app');
+      if (!app) return;
+      const bar = document.createElement('nav');
+      bar.className = 'azFilterBar';
+      bar.setAttribute('aria-label', 'Produkte alphabetisch filtern');
+      const allBtn = document.createElement('button');
+      allBtn.type = 'button';
+      allBtn.className = 'azAll active';
+      allBtn.textContent = 'Alle';
+      allBtn.dataset.letter = '';
+      bar.appendChild(allBtn);
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(letter => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = letter;
+        btn.dataset.letter = letter;
+        btn.setAttribute('aria-label', `Produkte mit ${letter}`);
+        bar.appendChild(btn);
+      });
+      app.parentNode.insertBefore(bar, app);
+
+      let activeLetter = '';
+      let allCategories = true;
+      let selectedCategory = null;
+      let observer;
+      let lastGrid = null;
+      let originalGrid = '';
+      let originalHeader = '';
+      const normalize = value => (value || '').trim().toLocaleUpperCase('de-DE')
+        .replace(/^Ä/, 'A').replace(/^Ö/, 'O').replace(/^Ü/, 'U');
+
+      function applyFilter() {
+        if (observer) observer.disconnect();
+        const panel = app.querySelector('.catPanel');
+        const list = panel?.querySelector('.catList');
+        const grid = app.querySelector('.productPanel .productGrid');
+        const header = app.querySelector('.productHeader h1');
+        if (!panel || !list || !grid || !header) {
+          if (observer) observer.observe(app, {childList:true,subtree:true});
+          return;
+        }
+        if (grid !== lastGrid) {
+          lastGrid = grid;
+          originalGrid = grid.innerHTML;
+          originalHeader = header.innerHTML;
+        }
+        let categoriesBtn = panel.querySelector('.allCategoriesBtn');
+        if (!categoriesBtn) {
+          categoriesBtn = document.createElement('button');
+          categoriesBtn.type = 'button';
+          categoriesBtn.className = 'catBtn allCategoriesBtn';
+          categoriesBtn.textContent = 'Alle Kategorien';
+          categoriesBtn.style.cssText = 'width:100%;margin:8px 0 10px;';
+          list.parentNode.insertBefore(categoriesBtn, list);
+          categoriesBtn.addEventListener('click', () => {
+            allCategories = true;
+            selectedCategory = null;
+            activeLetter = '';
+            bar.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === allBtn));
+            // Eindeutige Auswahl: alte Kategorie optisch abwählen.
+            list.querySelectorAll('.catBtn, [data-cat]').forEach(b => {
+              b.classList.remove('active');
+              b.setAttribute('aria-pressed', 'false');
+            });
+            applyFilter();
+          });
+        }
+        // Kategorie-Farben nach Beschriftung, unabhängig von der Implementierung in app.js.
+        const colors = {'Milchprodukte':'#64B5F6','Gemüse':'#81C784','Obst':'#FFB74D','Fleisch':'#E57373','Wurst':'#BA68C8','Fisch & Ei':'#4DD0E1','Konserven':'#A1887F','Getreide & Hülsenfrüchte':'#FFD54F','Gewürze & Öl':'#90A4AE','Süßes':'#F06292','Sonstiges':'#BDBDBD'};
+        list.querySelectorAll('.catBtn').forEach(b => {
+          const name = b.dataset.cat || (b.textContent || '').trim();
+          if (colors[name]) { b.style.backgroundColor = colors[name]; b.style.borderColor = colors[name]; b.style.color = '#182c45'; }
+        });
+        categoriesBtn.classList.toggle('active', allCategories);
+        if (allCategories) {
+          list.querySelectorAll('.catBtn.active, [data-cat].active').forEach(b => {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+          });
+        }
+        categoriesBtn.setAttribute('aria-pressed', String(allCategories));
+        if (!allCategories && !activeLetter) {
+          if (grid.dataset.azGenerated === 'true') {
+            grid.innerHTML = originalGrid;
+            grid.querySelectorAll('[data-product]').forEach(b => {
+              b.onclick = () => addProduct(b.dataset.product, b.dataset.file);
+            });
+          }
+          delete grid.dataset.azGenerated;
+          header.innerHTML = originalHeader;
+        } else {
+          const categories = Object.entries(PRODUCT_DATA);
+          const selected = allCategories ? categories : categories.filter(([key]) => key === (selectedCategory || state.activeCat));
+          const products = selected
+            .flatMap(([, category]) => category.items)
+            .filter(([name]) => !activeLetter || normalize(name).startsWith(activeLetter))
+            .sort(([nameA], [nameB]) => nameA.localeCompare(nameB, 'de-DE', {sensitivity:'base'}));
+          const categoryLabel = allCategories ? 'Alle Kategorien' : (selectedCategory || 'Kategorie');
+          header.textContent = activeLetter ? `${categoryLabel} – ${activeLetter}` : categoryLabel;
+          grid.innerHTML = products.length
+            ? products.map(([name,file]) => productCard(name,file)).join('')
+            : '<p class="azNoResults visible">Keine Produkte mit diesem Anfangsbuchstaben gefunden.</p>';
+          grid.dataset.azGenerated = 'true';
+          grid.querySelectorAll('[data-product]').forEach(b => {
+            b.onclick = () => addProduct(b.dataset.product,b.dataset.file);
+          });
+        }
+        if (observer) observer.observe(app, {childList:true,subtree:true});
+      }
+
+      bar.addEventListener('click', event => {
+        const btn = event.target.closest('button[data-letter]');
+        if (!btn) return;
+        activeLetter = btn.dataset.letter || '';
+        bar.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+        applyFilter();
+      });
+      // Die Auswahl einer Einzelkategorie führt wieder zu ihrer normalen Artikelansicht.
+      app.addEventListener('click', event => {
+        const categoryButton = event.target.closest('[data-cat]');
+        if (!categoryButton) return;
+        allCategories = false;
+        const categoryId = categoryButton.dataset.cat;
+        const label = (categoryButton.textContent || '').trim();
+        selectedCategory = Object.keys(PRODUCT_DATA).find(key => key === categoryId || key === label) || categoryId || label;
+        const allButton = app.querySelector('.allCategoriesBtn');
+        allButton?.classList.remove('active');
+        allButton?.setAttribute('aria-pressed', 'false');
+        activeLetter = '';
+        bar.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === allBtn));
+      }, true);
+      observer = new MutationObserver(applyFilter);
+      observer.observe(app, {childList:true,subtree:true});
+      applyFilter();
+    });
+  </script>
+
+  <script>
+    // Zusätzliche Warenkorb-Aktion, ohne in den Bezahlablauf einzugreifen.
+    document.addEventListener('DOMContentLoaded', () => {
+      const app = document.getElementById('app');
+      const observer = new MutationObserver(() => {
+        const panel = app.querySelector('.cartPanel, .basketPanel, .cart-panel, [class*="cartPanel"], [class*="basketPanel"]');
+        if (!panel || panel.querySelector('#emptyCartBtn')) return;
+        const btn = document.createElement('button');
+        btn.id = 'emptyCartBtn';
+        btn.type = 'button';
+        btn.className = 'clearCartButton';
+        btn.textContent = '🗑 Warenkorb leeren';
+        btn.addEventListener('click', () => {
+          if (!confirm('Warenkorb wirklich leeren?')) return;
+          if (typeof window.clearCart === 'function') window.clearCart();
+        });
+        const heading = panel.querySelector('h1,h2,h3,.cartHeader,.basketHeader');
+        if (heading) heading.insertAdjacentElement('afterend', btn);
+        else panel.prepend(btn);
+      });
+      observer.observe(app, {childList:true,subtree:true});
+    });
+  </script>
+
+  <script>
+    // Bildschirmfüllende Darstellung ohne vertikales App-Scrollen.
+    document.addEventListener('DOMContentLoaded', () => {
+      const app = document.getElementById('app');
+      const bar = document.querySelector('.azFilterBar');
+      const categoriesRow = document.querySelector('.allCategoriesBar');
+      const topbar = document.querySelector('.topbar');
+      if (!app) return;
+
+      let fitTimer;
+      function fitAppToViewport() {
+        window.clearTimeout(fitTimer);
+        fitTimer = window.setTimeout(() => {
+          app.style.transform = '';
+          app.style.width = '';
+          app.style.height = '';
+
+          const vh = window.visualViewport?.height || window.innerHeight;
+          const used = (topbar?.getBoundingClientRect().height || 0) + (bar?.getBoundingClientRect().height || 0) + (categoriesRow?.getBoundingClientRect().height || 0);
+          const available = Math.max(1, vh - used - 4);
+          const needed = Math.max(app.scrollHeight, app.getBoundingClientRect().height);
+          const scale = Math.min(1, available / Math.max(1, needed));
+
+          if (scale < 0.995) {
+            app.style.width = `${100 / scale}%`;
+            app.style.height = `${available / scale}px`;
+            app.style.transform = `scale(${scale})`;
+          } else {
+            app.style.height = `${available}px`;
+          }
+        }, 60);
+      }
+
+      const observer = new MutationObserver(fitAppToViewport);
+      observer.observe(app, {childList:true, subtree:true, attributes:true, attributeFilter:['class','style','hidden']});
+      window.addEventListener('resize', fitAppToViewport);
+      window.visualViewport?.addEventListener('resize', fitAppToViewport);
+      document.addEventListener('click', fitAppToViewport, true);
+      fitAppToViewport();
+    });
+  </script>
+
+</body>
+</html>
